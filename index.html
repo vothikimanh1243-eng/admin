@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -10,10 +9,30 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); position: relative; }
         #qrcode { display: inline-block; margin: 20px; }
         .id-box { font-size: 24px; font-weight: bold; color: #0d6efd; background: #e7f1ff; padding: 10px; border-radius: 8px; display: inline-block; letter-spacing: 2px; margin: 10px 0; }
-        video { width: 100%; max-height: 400px; background: black; border-radius: 8px; display: none; }
+        
+        /* Khung chứa video giám sát */
+        #video-container { display: none; margin-top: 15px; }
+        video { width: 100%; max-height: 400px; background: black; border-radius: 8px; }
+        
+        /* Nút ngắt kết nối */
+        .btn-disconnect {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            font-size: 1rem;
+            font-weight: bold;
+            color: white;
+            background-color: #dc3545;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 15px;
+            transition: opacity 0.2s;
+        }
+        .btn-disconnect:active { opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -21,17 +40,20 @@
 <div class="container">
     <h2>Bảng Điều Khiển Giám Sát (Admin)</h2>
     
+    <!-- Vùng thiết lập kết nối ban đầu -->
     <div id="setup-zone">
         <p>Sẵn sàng kết nối. Sử dụng máy phụ quét mã QR hoặc nhập ID bên dưới:</p>
-        <!-- Hiển thị ID bằng số để nhập từ xa -->
         <div>Mã kết nối từ xa:</div>
         <div id="admin-id-display" class="id-box">Đang tạo...</div>
-        
+        <br>
         <div id="qrcode"></div>
     </div>
 
-    <!-- Khung hiển thị Video từ máy phụ truyền về -->
-    <video id="remote-video" autoplay playsinline></video>
+    <!-- Vùng hiển thị Video và Nút chức năng khi đang giám sát -->
+    <div id="video-container">
+        <video id="remote-video" autoplay playsinline></video>
+        <button id="disconnect-btn" class="btn-disconnect">Ngắt kết nối dữ liệu</button>
+    </div>
 </div>
 
 <script>
@@ -40,9 +62,10 @@
     
     // Khởi tạo Peer với ID cố định này
     const peer = new Peer(customAdminId);
+    let currentCall = null;
 
     peer.on('open', (id) => {
-        // Hiển thị chuỗi ID rút gọn cho người dùng (chỉ hiển thị phần số)
+        // Hiển thị chuỗi ID rút gọn cho người dùng (chỉ lấy phần số)
         const displayId = id.replace('admin-', '');
         document.getElementById('admin-id-display').innerText = displayId;
 
@@ -57,16 +80,46 @@
 
     // Lắng nghe cuộc gọi từ máy phụ gửi tới
     peer.on('call', (call) => {
-        call.answer(); // Đồng ý nhận cuộc gọi
+        currentCall = call;
+        call.answer(); // Đồng ý nhận cuộc gọi (luồng video)
         
         call.on('stream', (remoteStream) => {
-            // Ẩn vùng QR và ID đi, hiện video lên
+            // Ẩn vùng QR và ID đi, hiện vùng video lên
             document.getElementById('setup-zone').style.display = 'none';
+            document.getElementById('video-container').style.display = 'block';
+            
             const video = document.getElementById('remote-video');
-            video.style.display = 'block';
             video.srcObject = remoteStream;
         });
+
+        // Xử lý sự kiện nếu máy phụ chủ động tắt kết nối trước
+        call.on('close', () => {
+            resetAdminUI();
+        });
     });
+
+    // Xử lý khi Admin nhấn nút "Ngắt kết nối dữ liệu"
+    document.getElementById('disconnect-btn').addEventListener('click', () => {
+        if (currentCall) {
+            currentCall.close(); // Đóng kết nối PeerCall (lệnh này cũng sẽ gửi tín hiệu tắt tới máy phụ)
+        }
+        resetAdminUI();
+        alert("Đã ngắt giám sát và khôi phục trạng thái chờ kết nối.");
+    });
+
+    // Hàm dọn dẹp luồng video và đưa Admin về màn hình mã QR ban đầu
+    function resetAdminUI() {
+        const video = document.getElementById('remote-video');
+        if (video.srcObject) {
+            // Dừng mọi track của stream để giải phóng card đồ họa/bộ nhớ
+            video.srcObject.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+        }
+        
+        // Ẩn video, hiển thị lại bảng QR / ID số
+        document.getElementById('video-container').style.display = 'none';
+        document.getElementById('setup-zone').style.display = 'block';
+    }
 </script>
 </body>
 </html>
