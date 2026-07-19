@@ -4,26 +4,35 @@
     <meta charset="UTF-8">
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        body { background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; font-family: sans-serif; }
-        .video-box { width: 400px; height: 225px; background: #000; border-radius: 10px; }
-        .led { padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; }
+        body { background: #121212; color: white; display: flex; gap: 20px; padding: 20px; font-family: sans-serif; }
+        .main-col { flex: 1; display: flex; flex-direction: column; align-items: center; }
+        .video-box { width: 500px; height: 280px; background: #000; border-radius: 10px; border: 2px solid #333; }
+        .chat-col { width: 300px; display: flex; flex-direction: column; border: 1px solid #333; border-radius: 10px; overflow: hidden; background: #1a1a1a; }
+        #chat-box { flex: 1; padding: 10px; overflow-y: auto; font-size: 0.9rem; }
+        .led { padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; margin: 5px; }
         .on { background: #1e4620; color: #4caf50; }
         .off { background: #4a1c1c; color: #f44336; }
     </style>
 </head>
 <body>
-    <h2>Admin - ID: <span id="my-id">...</span></h2>
-    <video id="remote-video" class="video-box" autoplay playsinline></video>
-    
-    <div>
-        <span id="led-cam" class="led off">Cam Phụ: Tắt</span>
-        <span id="led-mic" class="led off">Mic Phụ: Tắt</span>
+    <div class="main-col">
+        <h2>Admin - ID: <span id="my-id">...</span></h2>
+        <video id="remote-video" class="video-box" autoplay playsinline></video>
+        <div>
+            <span id="led-cam" class="led off">Cam: Tắt</span>
+            <span id="led-mic" class="led off">Mic: Tắt</span>
+        </div>
+        <div class="controls">
+            <button onclick="sendCmd('toggle-cam')">📷 Cam</button>
+            <button onclick="sendCmd('toggle-mic')">🎙️ Mic</button>
+            <button onclick="sendCmd('swap-cam')">🔄 Đổi Cam</button>
+        </div>
     </div>
 
-    <div class="controls">
-        <button onclick="sendCmd('toggle-cam')">📷 Bật/Tắt Cam Phụ</button>
-        <button onclick="sendCmd('toggle-mic')">🎙️ Bật/Tắt Mic Phụ</button>
-        <button onclick="sendCmd('swap-cam')">🔄 Đổi Cam Phụ</button>
+    <div class="chat-col">
+        <div id="chat-box"></div>
+        <input type="text" id="chat-input" placeholder="Chat..." onkeypress="if(event.key==='Enter') sendMsg()">
+        <button onclick="sendMsg()">Gửi</button>
     </div>
 
     <script>
@@ -38,14 +47,21 @@
             conn.on('data', (data) => {
                 if(data.type === 'status') {
                     document.getElementById('led-cam').className = `led ${data.cam ? 'on' : 'off'}`;
-                    document.getElementById('led-cam').innerText = data.cam ? 'Cam Phụ: Bật' : 'Cam Phụ: Tắt';
                     document.getElementById('led-mic').className = `led ${data.mic ? 'on' : 'off'}`;
-                    document.getElementById('led-mic').innerText = data.mic ? 'Mic Phụ: Bật' : 'Mic Phụ: Tắt';
+                    document.getElementById('led-cam').innerText = data.cam ? 'Cam: Bật' : 'Cam: Tắt';
+                    document.getElementById('led-mic').innerText = data.mic ? 'Mic: Bật' : 'Mic: Tắt';
                 }
+                if(data.type === 'chat') document.getElementById('chat-box').innerHTML += `<p>Phụ: ${data.val}</p>`;
             });
         });
 
         function sendCmd(cmd) { if(conn) conn.send({type: 'cmd', val: cmd}); }
+        function sendMsg() {
+            const input = document.getElementById('chat-input');
+            conn.send({type: 'chat', val: input.value});
+            document.getElementById('chat-box').innerHTML += `<p>Bạn: ${input.value}</p>`;
+            input.value = '';
+        }
     </script>
 </body>
 </html>
