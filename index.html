@@ -4,56 +4,57 @@
     <meta charset="UTF-8">
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        :root { --bg: #0f0f0f; --box: #1a1a1a; --on: #22c55e; --off: #ef4444; }
-        body { background: var(--bg); color: white; display: flex; justify-content: center; padding: 20px; font-family: sans-serif; }
-        .wrapper { display: flex; gap: 20px; width: 900px; }
-        .panel { background: var(--box); padding: 20px; border-radius: 20px; flex: 2; }
-        video { width: 100%; border-radius: 12px; border: 2px solid #333; }
-        .led-group { display: flex; gap: 10px; margin: 15px 0; }
-        .led { padding: 5px 12px; border-radius: 20px; font-weight: bold; font-size: 0.8rem; background: #333; }
-        .led.active { color: white; }
-        .led.cam-on { background: var(--on); } .led.cam-off { background: var(--off); }
-        .led.mic-on { background: var(--on); } .led.mic-off { background: var(--off); }
-        .chat-panel { flex: 1; background: var(--box); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; }
-        #chat-box { flex: 1; overflow-y: auto; border-bottom: 1px solid #333; margin-bottom: 10px; }
+        :root { --bg: #0f0f0f; --panel: #1a1a1a; --on: #22c55e; --off: #ef4444; }
+        body { background: var(--bg); color: #fff; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; padding: 20px; }
+        .wrapper { display: flex; gap: 20px; width: 1000px; }
+        .box { background: var(--panel); padding: 25px; border-radius: 20px; flex: 2; border: 1px solid #333; }
+        video { width: 100%; border-radius: 15px; border: 2px solid #444; background: #000; }
+        .led-group { display: flex; gap: 15px; margin: 20px 0; }
+        .led { padding: 8px 16px; border-radius: 20px; font-weight: bold; font-size: 0.9rem; transition: 0.3s; }
+        .led.on { background: var(--on); color: #064e3b; }
+        .led.off { background: var(--off); color: #7f1d1d; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        button { padding: 12px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; background: #333; color: white; }
+        button:hover { background: #444; }
+        .chat-panel { flex: 1; background: var(--panel); border-radius: 20px; padding: 20px; border: 1px solid #333; }
+        #chat-box { height: 350px; overflow-y: auto; margin-bottom: 10px; border-bottom: 1px solid #333; }
     </style>
 </head>
 <body>
     <div class="wrapper">
-        <div class="panel">
-            <h2>Admin - ID: <span id="my-id">...</span></h2>
+        <div class="box">
+            <h2>Admin - <span id="my-id" style="color:#3b82f6">...</span></h2>
             <video id="remote-video" autoplay playsinline></video>
             <div class="led-group">
-                <span id="led-cam" class="led cam-off">Cam: Tắt</span>
-                <span id="led-mic" class="led mic-off">Mic: Tắt</span>
+                <span id="led-cam" class="led off">Cam: Tắt</span>
+                <span id="led-mic" class="led off">Mic: Tắt</span>
             </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                <button onclick="sendCmd('toggle-cam')">📷 Bật/Tắt Cam</button>
-                <button onclick="sendCmd('toggle-mic')">🎙️ Bật/Tắt Mic</button>
+            <div class="btn-grid">
+                <button onclick="sendCmd('toggle-cam')">📷 Cam</button>
+                <button onclick="sendCmd('toggle-mic')">🎙️ Mic</button>
                 <button onclick="sendCmd('swap-cam')">🔄 Đổi Cam</button>
-                <button onclick="sendCmd('disconnect')" style="background:#991b1b">❌ Ngắt Kết Nối</button>
+                <button onclick="sendCmd('disconnect')" style="background:#7f1d1d">❌ Ngắt</button>
             </div>
         </div>
         <div class="chat-panel">
             <h3>Chat</h3>
             <div id="chat-box"></div>
-            <input id="chat-input" placeholder="Nhắn tin...">
+            <input id="chat-input" style="width:70%; padding:8px" placeholder="Nhắn...">
             <button onclick="sendMsg()">Gửi</button>
         </div>
     </div>
     <script>
-        const randomID = Math.floor(100000 + Math.random() * 900000).toString();
-        const peer = new Peer(randomID);
+        const peer = new Peer(Math.floor(100000 + Math.random() * 900000).toString());
         let conn;
-        peer.on('open', (id) => document.getElementById('my-id').innerText = id);
-        peer.on('call', (c) => { c.answer(); c.on('stream', (s) => document.getElementById('remote-video').srcObject = s); });
-        peer.on('connection', (c) => { 
-            conn = c; 
-            conn.on('data', (d) => {
+        peer.on('open', id => document.getElementById('my-id').innerText = id);
+        peer.on('call', call => { call.answer(); call.on('stream', s => document.getElementById('remote-video').srcObject = s); });
+        peer.on('connection', c => {
+            conn = c;
+            conn.on('data', d => {
                 if(d.type === 'status') {
-                    document.getElementById('led-cam').className = `led cam-${d.cam ? 'on' : 'off'}`;
+                    document.getElementById('led-cam').className = `led ${d.cam ? 'on' : 'off'}`;
                     document.getElementById('led-cam').innerText = d.cam ? 'Cam: Bật' : 'Cam: Tắt';
-                    document.getElementById('led-mic').className = `led mic-${d.mic ? 'on' : 'off'}`;
+                    document.getElementById('led-mic').className = `led ${d.mic ? 'on' : 'off'}`;
                     document.getElementById('led-mic').innerText = d.mic ? 'Mic: Bật' : 'Mic: Tắt';
                 }
                 if(d.type === 'chat') document.getElementById('chat-box').innerHTML += `<p>Phụ: ${d.val}</p>`;
