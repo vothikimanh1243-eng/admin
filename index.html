@@ -3,71 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
-   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f0f0f; color: #fff; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; gap: 20px; }
-    
-    .container { display: flex; gap: 20px; align-items: flex-start; }
-    
-    .panel { background: #1a1a1a; padding: 20px; border-radius: 15px; border: 1px solid #333; }
-    
-    #remote-video { width: 500px; height: 280px; background: #000; border-radius: 10px; border: 2px solid #444; display: block; margin-bottom: 15px; }
-    
-    .status-bar { display: flex; justify-content: center; gap: 10px; margin-bottom: 15px; }
-    .led { padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; }
-    .led.on { background: #155724; color: #75eb82; }
-    .led.off { background: #721c24; color: #ff8585; }
-
-    .controls { display: flex; justify-content: center; gap: 10px; }
-    button { padding: 10px 15px; border-radius: 8px; border: none; background: #333; color: white; cursor: pointer; transition: 0.3s; }
-    button:hover { background: #555; }
-
-    .chat-box-wrapper { width: 300px; height: 350px; display: flex; flex-direction: column; }
-    #chat-box { flex: 1; border: 1px solid #333; border-radius: 10px; margin-bottom: 10px; padding: 10px; background: #121212; overflow-y: auto; }
-    .chat-input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #333; background: #222; color: #fff; }
-</style>
+    <style>
+        :root { --bg: #0f0f0f; --panel: #1a1a1a; --accent: #3b82f6; --text: #ffffff; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; padding: 30px; }
+        .container { display: flex; gap: 20px; width: 900px; }
+        .box { background: var(--panel); padding: 20px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        video { width: 100%; border-radius: 15px; background: #000; border: 2px solid #333; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        button { padding: 12px; border: none; border-radius: 12px; background: #333; color: white; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background: var(--accent); }
+        .danger { background: #991b1b; }
+        #chat-box { height: 300px; overflow-y: auto; margin-bottom: 10px; border-bottom: 1px solid #333; padding: 5px; }
+    </style>
 </head>
 <body>
-    <div class="main-col">
-        <h2>Admin - ID: <span id="my-id">...</span></h2>
-        <video id="remote-video" class="video-box" autoplay playsinline></video>
-        <div>
-            <span id="led-cam" class="led off">Cam: Tắt</span>
-            <span id="led-mic" class="led off">Mic: Tắt</span>
+    <div class="container">
+        <div class="box" style="flex: 2;">
+            <h2>Admin - <span id="my-id" style="color:var(--accent)">...</span></h2>
+            <video id="remote-video" autoplay playsinline></video>
+            <div class="controls">
+                <button onclick="sendCmd('toggle-cam')">📷 Cam</button>
+                <button onclick="sendCmd('toggle-mic')">🎙️ Mic</button>
+                <button onclick="sendCmd('swap-cam')">🔄 Đổi Cam</button>
+                <button class="danger" onclick="sendCmd('disconnect')">❌ Ngắt Kết Nối</button>
+            </div>
         </div>
-        <div class="controls">
-            <button onclick="sendCmd('toggle-cam')">📷 Cam</button>
-            <button onclick="sendCmd('toggle-mic')">🎙️ Mic</button>
-            <button onclick="sendCmd('swap-cam')">🔄 Đổi Cam</button>
+        <div class="box" style="flex: 1;">
+            <h3>Chat</h3>
+            <div id="chat-box"></div>
+            <input id="chat-input" class="chat-input" placeholder="Nhập tin nhắn..." style="width: 80%; padding: 8px;">
+            <button onclick="sendMsg()">Gửi</button>
         </div>
     </div>
-
-    <div class="chat-col">
-        <div id="chat-box"></div>
-        <input type="text" id="chat-input" placeholder="Chat..." onkeypress="if(event.key==='Enter') sendMsg()">
-        <button onclick="sendMsg()">Gửi</button>
-    </div>
-
     <script>
         const randomID = Math.floor(100000 + Math.random() * 900000).toString();
         const peer = new Peer(randomID);
         let conn;
-
         peer.on('open', (id) => document.getElementById('my-id').innerText = id);
         peer.on('call', (call) => { call.answer(); call.on('stream', (s) => document.getElementById('remote-video').srcObject = s); });
         peer.on('connection', (c) => { 
             conn = c; 
             conn.on('data', (data) => {
-                if(data.type === 'status') {
-                    document.getElementById('led-cam').className = `led ${data.cam ? 'on' : 'off'}`;
-                    document.getElementById('led-mic').className = `led ${data.mic ? 'on' : 'off'}`;
-                    document.getElementById('led-cam').innerText = data.cam ? 'Cam: Bật' : 'Cam: Tắt';
-                    document.getElementById('led-mic').innerText = data.mic ? 'Mic: Bật' : 'Mic: Tắt';
-                }
                 if(data.type === 'chat') document.getElementById('chat-box').innerHTML += `<p>Phụ: ${data.val}</p>`;
             });
         });
-
-        function sendCmd(cmd) { if(conn) conn.send({type: 'cmd', val: cmd}); }
+        function sendCmd(cmd) { 
+            if(conn) conn.send({type: 'cmd', val: cmd}); 
+            if(cmd === 'disconnect') window.location.reload();
+        }
         function sendMsg() {
             const input = document.getElementById('chat-input');
             conn.send({type: 'chat', val: input.value});
