@@ -4,34 +4,40 @@
     <meta charset="UTF-8">
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        :root { --bg: #0f0f0f; --panel: #1a1a1a; --accent: #3b82f6; --text: #ffffff; }
-        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; padding: 30px; }
-        .container { display: flex; gap: 20px; width: 900px; }
-        .box { background: var(--panel); padding: 20px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        video { width: 100%; border-radius: 15px; background: #000; border: 2px solid #333; }
-        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        button { padding: 12px; border: none; border-radius: 12px; background: #333; color: white; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        button:hover { background: var(--accent); }
-        .danger { background: #991b1b; }
-        #chat-box { height: 300px; overflow-y: auto; margin-bottom: 10px; border-bottom: 1px solid #333; padding: 5px; }
+        :root { --bg: #0f0f0f; --box: #1a1a1a; --on: #22c55e; --off: #ef4444; }
+        body { background: var(--bg); color: white; display: flex; justify-content: center; padding: 20px; font-family: sans-serif; }
+        .wrapper { display: flex; gap: 20px; width: 900px; }
+        .panel { background: var(--box); padding: 20px; border-radius: 20px; flex: 2; }
+        video { width: 100%; border-radius: 12px; border: 2px solid #333; }
+        .led-group { display: flex; gap: 10px; margin: 15px 0; }
+        .led { padding: 5px 12px; border-radius: 20px; font-weight: bold; font-size: 0.8rem; background: #333; }
+        .led.active { color: white; }
+        .led.cam-on { background: var(--on); } .led.cam-off { background: var(--off); }
+        .led.mic-on { background: var(--on); } .led.mic-off { background: var(--off); }
+        .chat-panel { flex: 1; background: var(--box); border-radius: 20px; padding: 20px; display: flex; flex-direction: column; }
+        #chat-box { flex: 1; overflow-y: auto; border-bottom: 1px solid #333; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="box" style="flex: 2;">
-            <h2>Admin - <span id="my-id" style="color:var(--accent)">...</span></h2>
+    <div class="wrapper">
+        <div class="panel">
+            <h2>Admin - ID: <span id="my-id">...</span></h2>
             <video id="remote-video" autoplay playsinline></video>
-            <div class="controls">
-                <button onclick="sendCmd('toggle-cam')">📷 Cam</button>
-                <button onclick="sendCmd('toggle-mic')">🎙️ Mic</button>
+            <div class="led-group">
+                <span id="led-cam" class="led cam-off">Cam: Tắt</span>
+                <span id="led-mic" class="led mic-off">Mic: Tắt</span>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                <button onclick="sendCmd('toggle-cam')">📷 Bật/Tắt Cam</button>
+                <button onclick="sendCmd('toggle-mic')">🎙️ Bật/Tắt Mic</button>
                 <button onclick="sendCmd('swap-cam')">🔄 Đổi Cam</button>
-                <button class="danger" onclick="sendCmd('disconnect')">❌ Ngắt Kết Nối</button>
+                <button onclick="sendCmd('disconnect')" style="background:#991b1b">❌ Ngắt Kết Nối</button>
             </div>
         </div>
-        <div class="box" style="flex: 1;">
+        <div class="chat-panel">
             <h3>Chat</h3>
             <div id="chat-box"></div>
-            <input id="chat-input" class="chat-input" placeholder="Nhập tin nhắn..." style="width: 80%; padding: 8px;">
+            <input id="chat-input" placeholder="Nhắn tin...">
             <button onclick="sendMsg()">Gửi</button>
         </div>
     </div>
@@ -40,23 +46,21 @@
         const peer = new Peer(randomID);
         let conn;
         peer.on('open', (id) => document.getElementById('my-id').innerText = id);
-        peer.on('call', (call) => { call.answer(); call.on('stream', (s) => document.getElementById('remote-video').srcObject = s); });
+        peer.on('call', (c) => { c.answer(); c.on('stream', (s) => document.getElementById('remote-video').srcObject = s); });
         peer.on('connection', (c) => { 
             conn = c; 
-            conn.on('data', (data) => {
-                if(data.type === 'chat') document.getElementById('chat-box').innerHTML += `<p>Phụ: ${data.val}</p>`;
+            conn.on('data', (d) => {
+                if(d.type === 'status') {
+                    document.getElementById('led-cam').className = `led cam-${d.cam ? 'on' : 'off'}`;
+                    document.getElementById('led-cam').innerText = d.cam ? 'Cam: Bật' : 'Cam: Tắt';
+                    document.getElementById('led-mic').className = `led mic-${d.mic ? 'on' : 'off'}`;
+                    document.getElementById('led-mic').innerText = d.mic ? 'Mic: Bật' : 'Mic: Tắt';
+                }
+                if(d.type === 'chat') document.getElementById('chat-box').innerHTML += `<p>Phụ: ${d.val}</p>`;
             });
         });
-        function sendCmd(cmd) { 
-            if(conn) conn.send({type: 'cmd', val: cmd}); 
-            if(cmd === 'disconnect') window.location.reload();
-        }
-        function sendMsg() {
-            const input = document.getElementById('chat-input');
-            conn.send({type: 'chat', val: input.value});
-            document.getElementById('chat-box').innerHTML += `<p>Bạn: ${input.value}</p>`;
-            input.value = '';
-        }
+        function sendCmd(cmd) { if(conn) conn.send({type: 'cmd', val: cmd}); if(cmd==='disconnect') location.reload(); }
+        function sendMsg() { const i = document.getElementById('chat-input'); conn.send({type: 'chat', val: i.value}); document.getElementById('chat-box').innerHTML += `<p>Bạn: ${i.value}</p>`; i.value=''; }
     </script>
 </body>
 </html>
