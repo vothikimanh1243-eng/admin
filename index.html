@@ -2,123 +2,44 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bảng Điều Khiển Giám Sát (Admin)</title>
+    <title>Admin Dashboard</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
-    <!-- Thư viện tạo mã QR -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); position: relative; }
-        #qrcode { display: inline-block; margin: 20px; }
-        .id-box { font-size: 24px; font-weight: bold; color: #0d6efd; background: #e7f1ff; padding: 10px; border-radius: 8px; display: inline-block; letter-spacing: 2px; margin: 10px 0; }
-        
-        /* Khung chứa video giám sát */
-        #video-container { display: none; margin-top: 15px; }
-        video { width: 100%; max-height: 400px; background: black; border-radius: 8px; }
-        
-        /* Nút ngắt kết nối */
-        .btn-disconnect {
-            display: block;
-            width: 100%;
-            padding: 12px;
-            font-size: 1rem;
-            font-weight: bold;
-            color: white;
-            background-color: #dc3545;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            margin-top: 15px;
-            transition: opacity 0.2s;
-        }
-        .btn-disconnect:active { opacity: 0.8; }
+        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #fff; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .video-box { width: 640px; height: 360px; background: #000; border-radius: 15px; border: 2px solid #333; transition: 0.4s; }
+        .controls { margin-top: 20px; display: flex; gap: 10px; }
+        button { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; background: #333; color: white; transition: 0.3s; font-weight: bold; }
+        button:hover { background: #555; }
+        button.danger { background: #d9534f; }
+        #my-id { color: #00d4ff; font-size: 1.5rem; font-weight: bold; }
     </style>
 </head>
 <body>
+<h1>Bảng Điều Khiển Admin</h1>
+<p>ID kết nối: <span id="my-id">Đang khởi tạo...</span></p>
+<video id="remote-video" class="video-box" autoplay playsinline></video>
 
-<div class="container">
-    <h2>Bảng Điều Khiển Giám Sát (Admin)</h2>
-    
-    <!-- Vùng thiết lập kết nối ban đầu -->
-    <div id="setup-zone">
-        <p>Sẵn sàng kết nối. Sử dụng máy phụ quét mã QR hoặc nhập ID bên dưới:</p>
-        <div>Mã kết nối từ xa:</div>
-        <div id="admin-id-display" class="id-box">Đang tạo...</div>
-        <br>
-        <div id="qrcode"></div>
-    </div>
-
-    <!-- Vùng hiển thị Video và Nút chức năng khi đang giám sát -->
-    <div id="video-container">
-        <video id="remote-video" autoplay playsinline></video>
-        <button id="disconnect-btn" class="btn-disconnect">Ngắt kết nối dữ liệu</button>
-    </div>
+<div class="controls">
+    <button onclick="sendCmd('toggle-cam')">📷 Cam</button>
+    <button onclick="sendCmd('toggle-mic')">🎙️ Mic</button>
+    <button onclick="toggleLayout()">📱/💻 Layout</button>
+    <button class="danger" onclick="sendCmd('disconnect')">❌ Ngắt</button>
 </div>
 
 <script>
-    // Tạo 1 ID ngẫu nhiên gồm 6 chữ số để người dùng ở xa dễ nhập
-    const customAdminId = 'admin-' + Math.floor(100000 + Math.random() * 900000);
-    
-    // Khởi tạo Peer với ID cố định này
-    const peer = new Peer(customAdminId);
-    let currentCall = null;
+    const randomID = Math.floor(100000 + Math.random() * 900000).toString();
+    const peer = new Peer(randomID);
+    let conn;
 
-    peer.on('open', (id) => {
-        // Hiển thị chuỗi ID rút gọn cho người dùng (chỉ lấy phần số)
-        const displayId = id.replace('admin-', '');
-        document.getElementById('admin-id-display').innerText = displayId;
+    peer.on('open', (id) => document.getElementById('my-id').innerText = id);
+    peer.on('call', (call) => { call.answer(); call.on('stream', (s) => document.getElementById('remote-video').srcObject = s); });
+    peer.on('connection', (c) => { conn = c; });
 
-        // Tạo mã QR chứa toàn bộ ID đầy đủ để máy phụ quét phát ăn ngay
-        document.getElementById('qrcode').innerHTML = "";
-        new QRCode(document.getElementById("qrcode"), {
-            text: id,
-            width: 200,
-            height: 200
-        });
-    });
-
-    // Lắng nghe cuộc gọi từ máy phụ gửi tới
-    peer.on('call', (call) => {
-        currentCall = call;
-        call.answer(); // Đồng ý nhận cuộc gọi (luồng video)
-        
-        call.on('stream', (remoteStream) => {
-            // Ẩn vùng QR và ID đi, hiện vùng video lên
-            document.getElementById('setup-zone').style.display = 'none';
-            document.getElementById('video-container').style.display = 'block';
-            
-            const video = document.getElementById('remote-video');
-            video.srcObject = remoteStream;
-        });
-
-        // Xử lý sự kiện nếu máy phụ chủ động tắt kết nối trước
-        call.on('close', () => {
-            resetAdminUI();
-        });
-    });
-
-    // Xử lý khi Admin nhấn nút "Ngắt kết nối dữ liệu"
-    document.getElementById('disconnect-btn').addEventListener('click', () => {
-        if (currentCall) {
-            currentCall.close(); // Đóng kết nối PeerCall (lệnh này cũng sẽ gửi tín hiệu tắt tới máy phụ)
-        }
-        resetAdminUI();
-        alert("Đã ngắt giám sát và khôi phục trạng thái chờ kết nối.");
-    });
-
-    // Hàm dọn dẹp luồng video và đưa Admin về màn hình mã QR ban đầu
-    function resetAdminUI() {
-        const video = document.getElementById('remote-video');
-        if (video.srcObject) {
-            // Dừng mọi track của stream để giải phóng card đồ họa/bộ nhớ
-            video.srcObject.getTracks().forEach(track => track.stop());
-            video.srcObject = null;
-        }
-        
-        // Ẩn video, hiển thị lại bảng QR / ID số
-        document.getElementById('video-container').style.display = 'none';
-        document.getElementById('setup-zone').style.display = 'block';
+    function sendCmd(cmd) { if(conn) conn.send({type: 'cmd', val: cmd}); }
+    function toggleLayout() {
+        const v = document.getElementById('remote-video');
+        v.style.width = v.style.width === '360px' ? '640px' : '360px';
+        v.style.height = v.style.height === '640px' ? '360px' : '640px';
     }
 </script>
 </body>
