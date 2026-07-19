@@ -2,63 +2,28 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Dashboard - Live</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: #fff; display: flex; justify-content: center; gap: 20px; padding: 20px; }
-        .main-panel { display: flex; flex-direction: column; align-items: center; }
-        .video-box { width: 640px; height: 360px; background: #000; border-radius: 12px; border: 2px solid #333; transition: 0.4s; }
-        .status-bar { margin: 15px 0; display: flex; gap: 15px; font-size: 0.9rem; }
-        .led { padding: 6px 12px; border-radius: 20px; font-weight: bold; display: flex; align-items: center; gap: 6px; }
-        .led.on { background: #1e4620; color: #4caf50; border: 1px solid #4caf50; }
-        .led.off { background: #4a1c1c; color: #f44336; border: 1px solid #f44336; }
-        .controls { display: flex; gap: 10px; }
-        button { padding: 12px 18px; border: none; border-radius: 8px; cursor: pointer; background: #2a2a2a; color: white; transition: 0.2s; font-weight: bold; }
-        button:hover { background: #444; }
-        button.danger { background: #d9534f; }
-        button.danger:hover { background: #c9302c; }
-        
-        /* Giao diện Chat */
-        .chat-panel { width: 320px; height: 490px; background: #1a1a1a; border: 2px solid #333; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
-        .chat-header { background: #222; padding: 10px; text-align: center; font-weight: bold; border-bottom: 1px solid #333; }
-        .chat-messages { flex: 1; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-        .msg { padding: 8px 12px; border-radius: 8px; max-width: 80%; word-break: break-all; }
-        .msg.admin { background: #007bff; align-self: flex-end; }
-        .msg.phu { background: #333; align-self: flex-start; }
-        .chat-input-group { display: flex; padding: 10px; background: #222; gap: 5px; }
-        .chat-input-group input { flex: 1; padding: 10px; border-radius: 6px; border: none; background: #333; color: white; }
-        #btn-play-fallback { display: none; margin-top: 10px; background: #ff9800; color: black; }
+        body { background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; font-family: sans-serif; }
+        .video-box { width: 400px; height: 225px; background: #000; border-radius: 10px; }
+        .led { padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; }
+        .on { background: #1e4620; color: #4caf50; }
+        .off { background: #4a1c1c; color: #f44336; }
     </style>
 </head>
 <body>
-
-    <div class="main-panel">
-        <h2>Admin - ID: <span id="my-id" style="color:#00d4ff;">...</span></h2>
-        
-        <video id="remote-video" class="video-box" autoplay playsinline></video>
-        <button id="btn-play-fallback" onclick="triggerPlay()">Click để ép chạy Video nếu bị chặn</button>
-
-        <div class="status-bar">
-            <span>Trạng thái Máy Phụ:</span>
-            <span id="led-cam" class="led off">🔴 Cam Tắt</span>
-            <span id="led-mic" class="led off">🔴 Mic Tắt</span>
-        </div>
-        
-        <div class="controls">
-            <button onclick="sendCmd('toggle-cam')">📷 Cam</button>
-            <button onclick="sendCmd('toggle-mic')">🎙️ Mic</button>
-            <button onclick="toggleLayout()">📱/💻 Layout</button>
-            <button class="danger" onclick="sendCmd('disconnect')">❌ Ngắt</button>
-        </div>
+    <h2>Admin - ID: <span id="my-id">...</span></h2>
+    <video id="remote-video" class="video-box" autoplay playsinline></video>
+    
+    <div>
+        <span id="led-cam" class="led off">Cam Phụ: Tắt</span>
+        <span id="led-mic" class="led off">Mic Phụ: Tắt</span>
     </div>
 
-    <div class="chat-panel">
-        <div class="chat-header">Hộp Thoại Chat</div>
-        <div id="chat-box" class="chat-messages"></div>
-        <div class="chat-input-group">
-            <input type="text" id="chat-input" placeholder="Nhập tin nhắn..." onkeypress="if(event.key==='Enter') sendMsg()">
-            <button onclick="sendMsg()">Gửi</button>
-        </div>
+    <div class="controls">
+        <button onclick="sendCmd('toggle-cam')">📷 Bật/Tắt Cam Phụ</button>
+        <button onclick="sendCmd('toggle-mic')">🎙️ Bật/Tắt Mic Phụ</button>
+        <button onclick="sendCmd('swap-cam')">🔄 Đổi Cam Phụ</button>
     </div>
 
     <script>
@@ -67,60 +32,20 @@
         let conn;
 
         peer.on('open', (id) => document.getElementById('my-id').innerText = id);
-
-        peer.on('call', (call) => {
-            call.answer();
-            call.on('stream', (s) => {
-                const video = document.getElementById('remote-video');
-                video.srcObject = s;
-                video.play().catch(() => {
-                    // Nếu trình duyệt chặn phát tự động, hiện nút này để admin bấm kích hoạt công khai
-                    document.getElementById('btn-play-fallback').style.display = 'block';
-                });
-            });
-        });
-
-        peer.on('connection', (c) => {
-            conn = c;
+        peer.on('call', (call) => { call.answer(); call.on('stream', (s) => document.getElementById('remote-video').srcObject = s); });
+        peer.on('connection', (c) => { 
+            conn = c; 
             conn.on('data', (data) => {
-                if (data.type === 'chat') appendMsg('phu', data.val);
-                if (data.type === 'status') updateLeds(data.cam, data.mic);
+                if(data.type === 'status') {
+                    document.getElementById('led-cam').className = `led ${data.cam ? 'on' : 'off'}`;
+                    document.getElementById('led-cam').innerText = data.cam ? 'Cam Phụ: Bật' : 'Cam Phụ: Tắt';
+                    document.getElementById('led-mic').className = `led ${data.mic ? 'on' : 'off'}`;
+                    document.getElementById('led-mic').innerText = data.mic ? 'Mic Phụ: Bật' : 'Mic Phụ: Tắt';
+                }
             });
         });
-
-        function triggerPlay() {
-            document.getElementById('remote-video').play();
-            document.getElementById('btn-play-fallback').style.display = 'none';
-        }
 
         function sendCmd(cmd) { if(conn) conn.send({type: 'cmd', val: cmd}); }
-
-        function sendMsg() {
-            const input = document.getElementById('chat-input');
-            if(!input.value.trim() || !conn) return;
-            conn.send({type: 'chat', val: input.value});
-            appendMsg('admin', input.value);
-            input.value = '';
-        }
-
-        function appendMsg(sender, text) {
-            const box = document.getElementById('chat-box');
-            box.innerHTML += `<div class="msg ${sender}">${text}</div>`;
-            box.scrollTop = box.scrollHeight;
-        }
-
-        function updateLeds(cam, mic) {
-            document.getElementById('led-cam').className = `led ${cam ? 'on' : 'off'}`;
-            document.getElementById('led-cam').innerText = cam ? '🟢 Cam Bật' : '🔴 Cam Tắt';
-            document.getElementById('led-mic').className = `led ${mic ? 'on' : 'off'}`;
-            document.getElementById('led-mic').innerText = mic ? '🟢 Mic Bật' : '🔴 Mic Tắt';
-        }
-
-        function toggleLayout() {
-            const v = document.getElementById('remote-video');
-            v.style.width = v.style.width === '360px' ? '640px' : '360px';
-            v.style.height = v.style.height === '640px' ? '360px' : '640px';
-        }
     </script>
 </body>
 </html>
