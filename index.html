@@ -2,13 +2,18 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Dashboard - WebRTC Stream</title>
+    <title>Admin Control Center - Secure</title>
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
         :root { --bg: #0b0f19; --panel: #111827; --border: #1f2937; --accent: #3b82f6; --on: #10b981; --off: #ef4444; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: var(--bg); color: #f9fafb; font-family: system-ui, -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
-        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; max-width: 1200px; }
+        
+        /* Màn hình khóa Key */
+        #auth-overlay { position: fixed; inset: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .auth-card { background: var(--panel); border: 1px solid var(--border); padding: 30px; border-radius: 16px; width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; }
+        
+        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; max-width: 1200px; display: none; }
         .card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 15px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
         .video-box { position: relative; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
         video { width: 100%; height: 100%; object-fit: cover; }
@@ -28,11 +33,24 @@
         input:focus { border-color: var(--accent); }
         .id-badge { background: #1f2937; padding: 8px 12px; border-radius: 8px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
         #my-id { color: var(--accent); font-weight: bold; }
+        .error-msg { color: var(--off); font-size: 0.8rem; display: none; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Panel Điều Khiển & Remote Stream -->
+
+    <!-- Giao diện nhập Key bảo mật -->
+    <div id="auth-overlay">
+        <div class="auth-card">
+            <h2>🔒 Xác Thực Admin</h2>
+            <p style="font-size: 0.85rem; color: #9ca3af;">Vui lòng nhập Key truy cập để vào hệ thống</p>
+            <input type="password" id="key-input" placeholder="phu682010@" onkeypress="if(event.key==='Enter') verifyKey()">
+            <span id="error-msg" class="error-msg">Key không chính xác!</span>
+            <button class="btn-primary" onclick="verifyKey()">Xác Nhận</button>
+        </div>
+    </div>
+
+    <!-- Giao diện chính sau khi vượt qua Key -->
+    <div class="container" id="main-content">
         <div class="card">
             <h2>🖥️ Admin Control Center</h2>
             <div class="id-badge"><span>ID Của Bạn:</span> <span id="my-id">Đang khởi tạo...</span></div>
@@ -55,7 +73,6 @@
             <button class="btn-danger" onclick="location.reload()">❌ Ngắt Kết Nối Toàn Bộ</button>
         </div>
 
-        <!-- Panel Stream Của Admin & Chat -->
         <div class="card">
             <h2>📹 Luồng Phát Của Bạn</h2>
             <div class="video-box">
@@ -78,12 +95,52 @@
     </div>
 
     <script>
-        const peer = new Peer(Math.floor(100000 + Math.random() * 900000).toString());
-        let conn, localStream, remoteStream, localCamMode = 'user';
+        // CẤU HÌNH KEY ADMIN TẠI ĐÂY
+        const ADMIN_SECRET_KEY = "admin123@secure"; 
 
-        peer.on('open', id => document.getElementById('my-id').innerText = id);
+        function verifyKey() {
+            const val = document.getElementById('key-input').value;
+            if(val === ADMIN_SECRET_KEY) {
+                document.getElementById('auth-overlay').style.display = 'none';
+                document.getElementById('main-content').style.display = 'grid';
+                initPeerSystem();
+            } else {
+                document.getElementById('error-msg').style.display = 'block';
+            }
+        }
 
-        // Khởi động Camera/Mic của Admin
+        let peer, conn, localStream, remoteStream, localCamMode = 'user';
+
+        function initPeerSystem() {
+            peer = new Peer(Math.floor(100000 + Math.random() * 900000).toString());
+            peer.on('open', id => document.getElementById('my-id').innerText = id);
+
+            initLocalStream();
+
+            peer.on('call', call => {
+                call.answer(localStream);
+                call.on('stream', stream => {
+                    remoteStream = stream;
+                    document.getElementById('remote-video').srcObject = stream;
+                });
+            });
+
+            peer.on('connection', c => {
+                conn = c;
+                conn.on('data', d => {
+                    if(d.type === 'status') {
+                        document.getElementById('led-cam').className = `led ${d.cam ? 'on' : 'off'}`;
+                        document.getElementById('led-cam').innerText = d.cam ? 'Cam: Bật' : 'Cam: Tắt';
+                        document.getElementById('led-mic').className = `led ${d.mic ? 'on' : 'off'}`;
+                        document.getElementById('led-mic').innerText = d.mic ? 'Mic: Bật' : 'Mic: Tắt';
+                    }
+                    if(d.type === 'chat') {
+                        appendChat('Phụ', d.val);
+                    }
+                });
+            });
+        }
+
         async function initLocalStream() {
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ 
@@ -95,31 +152,6 @@
                 alert("Không thể truy cập Camera/Mic của bạn!");
             }
         }
-        initLocalStream();
-
-        // Nhận cuộc gọi và kết nối dữ liệu từ Máy Phụ
-        peer.on('call', call => {
-            call.answer(localStream); // Trả về luồng video của Admin cho Phụ
-            call.on('stream', stream => {
-                remoteStream = stream;
-                document.getElementById('remote-video').srcObject = stream;
-            });
-        });
-
-        peer.on('connection', c => {
-            conn = c;
-            conn.on('data', d => {
-                if(d.type === 'status') {
-                    document.getElementById('led-cam').className = `led ${d.cam ? 'on' : 'off'}`;
-                    document.getElementById('led-cam').innerText = d.cam ? 'Cam: Bật' : 'Cam: Tắt';
-                    document.getElementById('led-mic').className = `led ${d.mic ? 'on' : 'off'}`;
-                    document.getElementById('led-mic').innerText = d.mic ? 'Mic: Bật' : 'Mic: Tắt';
-                }
-                if(d.type === 'chat') {
-                    appendChat('Phụ', d.val);
-                }
-            });
-        });
 
         function sendCmd(cmd) {
             if(conn && conn.open) conn.send({ type: 'cmd', val: cmd });
@@ -142,8 +174,6 @@
             localStream.getTracks().forEach(t => t.stop());
             localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: localCamMode }, audio: true });
             document.getElementById('local-video').srcObject = localStream;
-            // Cập nhật lại stream gửi đi nếu đang gọi
-            peer.listAllConnections ? '' : null; // PeerJS tự động xử lý track nếu thay thế, hoặc gọi lại call nếu cần
         }
 
         function sendMsg() {
