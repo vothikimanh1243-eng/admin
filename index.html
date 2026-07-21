@@ -43,7 +43,7 @@
         <div class="auth-card">
             <h2>🔒 Xác Thực Admin</h2>
             <p style="font-size: 0.85rem; color: #9ca3af;">Vui lòng nhập Key truy cập để vào hệ thống</p>
-            <input type="password" id="key-input" placeholder="phu682010@" onkeypress="if(event.key==='Enter') verifyKey()">
+            <input type="password" id="key-input" placeholder="nhập key" onkeypress="if(event.key==='Enter') verifyKey()">
             <span id="error-msg" class="error-msg">Key không chính xác!</span>
             <button class="btn-primary" onclick="verifyKey()">Xác Nhận</button>
         </div>
@@ -96,7 +96,7 @@
 
     <script>
         // CẤU HÌNH KEY ADMIN TẠI ĐÂY
-        const ADMIN_SECRET_KEY = "admin123@secure"; 
+        const ADMIN_SECRET_KEY = "68201063@"; 
 
         function verifyKey() {
             const val = document.getElementById('key-input').value;
